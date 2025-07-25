@@ -132,7 +132,7 @@ defmodule Calex.DecodingTest do
        cm92ZSodRm9yZXN0IEdyb3ZlIENvbW11bml0eSBDaHVyY2gyDjUwMiBXZWJzdGVyIFN0MhRTYXN
        rYXRvb24gU0sgUzdOIDNQOTIGQ2FuYWRhOC9aJwolCJ7FiJDmxN6i8gESEglUjzS4rRJKQBFBiv
        DldKVawBiuTZADAQ==;X-APPLE-RADIUS=123.4774275404302;X-APPLE-REFERENCEFRAME=
-       1;X-TITLE=The Wedge:geo:42.145927,-100.585260
+       1;X-TITLE=The Wedge:geo:42.145927\\,-100.585260
       END:VEVENT
       END:VCALENDAR
       """)
@@ -366,6 +366,33 @@ defmodule Calex.DecodingTest do
                          x_comma: "1,2,3",
                          x_semicolon: "1;2;3"
                        ]
+                     }
+                   ]
+                 ]
+               ]
+             ]
+           ]
+  end
+
+  test "escaped characters in property value" do
+    # note the ~S used here to disable escaping
+    data =
+      crlf(~S"""
+      BEGIN:VCALENDAR
+      BEGIN:VEVENT
+      DESCRIPTION:text escaping \\ \; \, \N \n \\n end
+      END:VEVENT
+      END:VCALENDAR
+      """)
+
+    assert Calex.decode!(data) == [
+             vcalendar: [
+               [
+                 vevent: [
+                   [
+                     description: {
+                       "text escaping \\ ; , \n \n \\n end",
+                       []
                      }
                    ]
                  ]

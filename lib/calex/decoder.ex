@@ -27,7 +27,7 @@ defmodule Calex.Decoder do
         {[], acc <> rest}
 
       line, prevline ->
-        {(prevline && [String.replace(prevline, "\\n", "\n")]) || [], line}
+        {(prevline && [prevline]) || [], line}
     end)
     |> elem(0)
   end
@@ -117,8 +117,19 @@ defmodule Calex.Decoder do
         decode_duration(val)
 
       true ->
-        val
+        unescape_prop_value(val)
     end
+  end
+
+  defp unescape_prop_value(val) do
+    val
+    |> String.replace(~r/\\(\\|;|,|N|n)/, fn
+      "\\\\" -> "\\"
+      "\\;" -> ";"
+      "\\," -> ","
+      "\\N" -> "\n"
+      "\\n" -> "\n"
+    end)
   end
 
   defp decode_local_datetime(val, time_zone) do

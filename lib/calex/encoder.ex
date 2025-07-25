@@ -72,8 +72,24 @@ defmodule Calex.Encoder do
   # encode value with empty props
   defp encode_value({k, {v, _}}), do: "#{encode_key(k)}:#{encode_value(v)}"
 
-  defp encode_value(atom) when is_atom(atom), do: atom |> to_string() |> String.upcase()
-  defp encode_value(other), do: other
+  defp encode_value(atom) when is_atom(atom),
+    do: atom |> to_string() |> String.upcase() |> escape_property_value()
+
+  defp encode_value(text) when is_binary(text),
+    do: text |> escape_property_value()
+
+  defp encode_value(other), do: other |> to_string() |> escape_property_value()
+
+  defp escape_property_value(value) do
+    value
+    |> String.replace(~r/(\\|;|,|\r\n|\n)/, fn
+      "\\" -> "\\\\"
+      ";" -> "\\;"
+      "," -> "\\,"
+      "\r\n" -> "\\n"
+      "\n" -> "\\n"
+    end)
+  end
 
   defp encode_param_value(atom) when is_atom(atom),
     do: atom |> to_string() |> String.upcase() |> escape_param_value()
@@ -116,7 +132,6 @@ defmodule Calex.Encoder do
     if String.length(bin) <= 75 do
       bin
     else
-      bin = String.replace(bin, ~r/[\r|\n]/, "\\n")
       {str_left, str_right} = String.split_at(bin, 75)
       str_left <> "\r\n " <> encode_line(str_right)
     end

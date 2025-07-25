@@ -218,6 +218,33 @@ defmodule Calex.EncodingTest do
              """)
   end
 
+  test "escaped characters in property value" do
+    data = [
+      vcalendar: [
+        [
+          vevent: [
+            [
+              description: {
+                "text escaping \\ ; , \n \r\n \\n \" end",
+                []
+              }
+            ]
+          ]
+        ]
+      ]
+    ]
+
+    # note the ~S used here to disable escaping
+    assert Calex.encode!(data) ==
+             crlf(~S"""
+             BEGIN:VCALENDAR
+             BEGIN:VEVENT
+             DESCRIPTION:text escaping \\ \; \, \n \n \\n " end
+             END:VEVENT
+             END:VCALENDAR
+             """)
+  end
+
   defp crlf(string) do
     string
     |> String.split("\n")
