@@ -146,7 +146,7 @@ defmodule Calex.DecodingTest do
                 {"geo:42.145927,-100.585260",
                  [
                    value: "URI",
-                   x_address: "\"500 Nicollet St, Minneapolis, MN, United Stat\"",
+                   x_address: "500 Nicollet St, Minneapolis, MN, United Stat",
                    x_apple_mapkit_handle:
                      "CAEStwIIrk0QnsWIkObE3qLyARoS CVSPNLitEkpAEUGK8OV0pVrAIpoBCgZDYW5hZGESAkNBGgxTYXNrYXRjaGV3YW4iAlNLKg9EaXZpc2lvbiBOby4gMTEyCVNhc2thdG9vbjoHUzdOIDNQOUIMRm9yZXN0IEdyb3ZlUgpXZWJzdGVyIFN0WgM1MDJiDjUwMiBXZWJzdGVyIFN0igEWVW5pdmVyc2l0eSBIZWlnaHRzIFNEQYoBDEZvcmVzdCBHcm92ZSodRm9yZXN0IEdyb3ZlIENvbW11bml0eSBDaHVyY2gyDjUwMiBXZWJzdGVyIFN0MhRTYXNrYXRvb24gU0sgUzdOIDNQOTIGQ2FuYWRhOC9aJwolCJ7FiJDmxN6i8gESEglUjzS4rRJKQBFBivDldKVawBiuTZADAQ==",
                    x_apple_radius: "123.4774275404302",
@@ -180,7 +180,37 @@ defmodule Calex.DecodingTest do
         e in [Calex.DecodeError] -> e
       end
 
-    assert exception.message == "property has no value: [\"Myrtle Beach SC 29579\"]"
+    assert exception.message == "property has no value: \"Myrtle Beach SC 29579\""
+  end
+
+  test "fails on line with no property key" do
+    data =
+      crlf("""
+      BEGIN:VCALENDAR
+      BEGIN:VEVENT
+      :text
+      END:VEVENT
+      END:VCALENDAR
+      """)
+
+    assert_raise(Calex.DecodeError, "property key missing or blank line", fn ->
+      Calex.decode!(data)
+    end)
+  end
+
+  test "fails on blank line" do
+    data =
+      crlf("""
+      BEGIN:VCALENDAR
+      BEGIN:VEVENT
+
+      END:VEVENT
+      END:VCALENDAR
+      """)
+
+    assert_raise(Calex.DecodeError, "property key missing or blank line", fn ->
+      Calex.decode!(data)
+    end)
   end
 
   test "decodes negative GMT offset dates" do
@@ -310,6 +340,38 @@ defmodule Calex.DecodingTest do
     assert_raise Calex.InvalidTimeZoneError, fn ->
       Calex.decode!(data)
     end
+  end
+
+  test "escaped semicolon and colon in param values" do
+    data =
+      crlf("""
+      BEGIN:VCALENDAR
+      BEGIN:VEVENT
+      ORGANIZER;CN=Dwayne 'The Rock' Johnson;SENT-BY="mailto:person@example.com";
+       X-COMMA="1,2,3";X-SEMICOLON="1;2;3":mailto:organizer@example.com
+      END:VEVENT
+      END:VCALENDAR
+      """)
+
+    assert Calex.decode!(data) == [
+             vcalendar: [
+               [
+                 vevent: [
+                   [
+                     organizer: {
+                       "mailto:organizer@example.com",
+                       [
+                         cn: "Dwayne 'The Rock' Johnson",
+                         sent_by: "mailto:person@example.com",
+                         x_comma: "1,2,3",
+                         x_semicolon: "1;2;3"
+                       ]
+                     }
+                   ]
+                 ]
+               ]
+             ]
+           ]
   end
 
   defp crlf(string) do

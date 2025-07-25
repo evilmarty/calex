@@ -184,6 +184,40 @@ defmodule Calex.EncodingTest do
              """)
   end
 
+  test "parameter values are properly escaped" do
+    data = [
+      vcalendar: [
+        [
+          vevent: [
+            [
+              organizer: {
+                "mailto:organizer@example.com",
+                [
+                  cn: ~s(Dwayne "The Rock" \n\nJohnson),
+                  sent_by: "mailto:person@example.com",
+                  x_comma: "1,2,3",
+                  x_semicolon: "1;2;3",
+                  x_type: :important
+                ]
+              }
+            ]
+          ]
+        ]
+      ]
+    ]
+
+    assert Calex.encode!(data) ==
+             crlf("""
+             BEGIN:VCALENDAR
+             BEGIN:VEVENT
+             ORGANIZER;CN=Dwayne 'The Rock' Johnson;SENT-BY="mailto:person@example.com";
+              X-COMMA="1,2,3";X-SEMICOLON="1;2;3";X-TYPE=IMPORTANT:mailto:organizer@examp
+              le.com
+             END:VEVENT
+             END:VCALENDAR
+             """)
+  end
+
   defp crlf(string) do
     string
     |> String.split("\n")
