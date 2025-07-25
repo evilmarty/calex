@@ -27,7 +27,7 @@ defmodule Calex.Decoder do
         {[], acc <> rest}
 
       line, prevline ->
-        {(prevline && [String.replace(prevline, "\\n", "\n")]) || [], line}
+        {(prevline && [prevline]) || [], line}
     end)
     |> elem(0)
   end
@@ -51,40 +51,54 @@ defmodule Calex.Decoder do
 
   # decode key,params and value for each prop
   defp decode_prop(prop) do
-    case String.split(prop, ":", parts: 2) do
-      [keyprops, val] ->
-        case String.split(keyprops, ";") do
-          ["DURATION"] ->
-            {:duration, {Timex.Duration.parse!(val), []}}
+    case split_content_line(prop) do
+      ["", _prop_val] ->
+        raise DecodeError, message: "property key missing or blank line"
 
-          [key] ->
-            {decode_key(key), {decode_value(val, []), []}}
+      [prop_key, ""] ->
+        raise DecodeError, message: "property has no value: #{inspect(prop_key)}"
 
-          [key | props] ->
-            props =
-              props
-              |> Enum.map(fn prop ->
-                [k, v] =
-                  case String.split(prop, "=") do
-                    [k1, v1] ->
-                      [k1, v1]
-
-                    [k1 | tl] ->
-                      # This case handles malformed X-APPLE-STRUCTURED-LOCATION
-                      # properties that fail to quote-escape `=` characters.
-                      [k1, Enum.join(tl, "=")]
-                  end
-
-                {decode_key(k), v}
-              end)
-
-            {decode_key(key), {decode_value(val, props), props}}
+      [prop_key, prop_val] ->
+        case prop_key do
+          "DURATION" -> {:duration, {decode_duration(prop_val), []}}
+          prop_key -> {decode_key(prop_key), {decode_value(prop_val, []), []}}
         end
 
-      prop ->
-        raise DecodeError, message: "property has no value: #{inspect(prop)}"
+      [prop_key | params_and_prop_val] ->
+        {raw_params, [prop_val]} = Enum.split(params_and_prop_val, -1)
+
+        params =
+          raw_params
+          |> Enum.map(fn raw_param ->
+            [k, v] = String.split(raw_param, "=", parts: 2)
+
+            {decode_key(k), v}
+          end)
+
+        {decode_key(prop_key), {decode_value(prop_val, params), params}}
     end
   end
+
+  defp split_content_line(line),
+    do: split_content_line(line, "", [], false)
+
+  # Following parses on a byte-by-byte basis.  This works because multi-byte
+  # UTF-8 won't contain these characters (ASCII starts with a 0 bit while all
+  # other UTF-8 bytes start with a 1 bit)
+  defp split_content_line("", char_acc, list_acc, _in_quotes),
+    do: ["" | [char_acc | list_acc]] |> Enum.reverse()
+
+  defp split_content_line(<<"\"", rest::binary>>, char_acc, list_acc, in_quotes),
+    do: split_content_line(rest, char_acc, list_acc, not in_quotes)
+
+  defp split_content_line(<<":", rest::binary>>, char_acc, list_acc, false = _in_quotes),
+    do: [rest | [char_acc | list_acc]] |> Enum.reverse()
+
+  defp split_content_line(<<";", rest::binary>>, char_acc, list_acc, false = in_quotes),
+    do: split_content_line(rest, "", [char_acc | list_acc], in_quotes)
+
+  defp split_content_line(<<char, rest::binary>>, char_acc, list_acc, in_quotes),
+    do: split_content_line(rest, char_acc <> <<char>>, list_acc, in_quotes)
 
   defp decode_value(val, props) do
     time_zone = Keyword.get(props, :tzid)
@@ -103,8 +117,19 @@ defmodule Calex.Decoder do
         decode_duration(val)
 
       true ->
-        val
+        unescape_prop_value(val)
     end
+  end
+
+  defp unescape_prop_value(val) do
+    val
+    |> String.replace(~r/\\(\\|;|,|N|n)/, fn
+      "\\\\" -> "\\"
+      "\\;" -> ";"
+      "\\," -> ","
+      "\\N" -> "\n"
+      "\\n" -> "\n"
+    end)
   end
 
   defp decode_local_datetime(val, time_zone) do

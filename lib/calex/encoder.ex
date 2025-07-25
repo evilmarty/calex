@@ -64,7 +64,7 @@ defmodule Calex.Encoder do
   defp encode_value({k, {v, [{_k, _v} | _] = props}}) do
     encoded_props =
       props
-      |> Enum.map_join(";", fn {pk, pv} -> "#{encode_key(pk)}=#{encode_value(pv)}" end)
+      |> Enum.map_join(";", fn {pk, pv} -> "#{encode_key(pk)}=#{encode_param_value(pv)}" end)
 
     "#{encode_key(k)};#{encoded_props}:#{encode_value(v)}"
   end
@@ -72,8 +72,54 @@ defmodule Calex.Encoder do
   # encode value with empty props
   defp encode_value({k, {v, _}}), do: "#{encode_key(k)}:#{encode_value(v)}"
 
-  defp encode_value(atom) when is_atom(atom), do: atom |> to_string() |> String.upcase()
-  defp encode_value(other), do: other
+  defp encode_value(atom) when is_atom(atom),
+    do: atom |> to_string() |> String.upcase() |> escape_property_value()
+
+  defp encode_value(text) when is_binary(text),
+    do: text |> escape_property_value()
+
+  defp encode_value(other), do: other |> to_string() |> escape_property_value()
+
+  defp escape_property_value(value) do
+    value
+    |> String.replace(~r/(\\|;|,|\r\n|\n)/, fn
+      "\\" -> "\\\\"
+      ";" -> "\\;"
+      "," -> "\\,"
+      "\r\n" -> "\\n"
+      "\n" -> "\\n"
+    end)
+  end
+
+  defp encode_param_value(atom) when is_atom(atom),
+    do: atom |> to_string() |> String.upcase() |> escape_param_value()
+
+  defp encode_param_value(string) when is_binary(string),
+    do: string |> escape_param_value()
+
+  defp encode_param_value(other),
+    do: other |> to_string() |> escape_param_value()
+
+  # param-value needs to be wrapped in double quotes if it contains
+  # ";", ":", or "," and must never contain a double quote or any
+  # control characters
+  # ref: https://datatracker.ietf.org/doc/html/rfc5545#section-3.1
+  defp escape_param_value(value) do
+    # Not allowed to have a DQUOTE character in a value, but also
+    # no way to properly escape, so replace it with single quote.
+    # Then filter out all the CONTROL characters that are not allowed.
+    cleaned_value =
+      value
+      |> String.replace(~s("), ~s('))
+      |> String.replace(~r/[\x00-\x08\x0A-\x1F\x7F]/, "")
+
+    cleaned_value
+    |> String.contains?(~w(; : ,))
+    |> case do
+      true -> ~s("#{cleaned_value}")
+      false -> cleaned_value
+    end
+  end
 
   defp encode_key(k) do
     k |> to_string() |> String.replace("_", "-") |> String.upcase()
@@ -86,7 +132,6 @@ defmodule Calex.Encoder do
     if String.length(bin) <= 75 do
       bin
     else
-      bin = String.replace(bin, ~r/[\r|\n]/, "\\n")
       {str_left, str_right} = String.split_at(bin, 75)
       str_left <> "\r\n " <> encode_line(str_right)
     end

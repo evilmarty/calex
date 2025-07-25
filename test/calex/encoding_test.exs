@@ -184,6 +184,113 @@ defmodule Calex.EncodingTest do
              """)
   end
 
+  test "encodes atom property value" do
+    data = [
+      vcalendar: [
+        [
+          vevent: [
+            [
+              class: {:public, []}
+            ]
+          ]
+        ]
+      ]
+    ]
+
+    assert Calex.encode!(data) ==
+             crlf("""
+             BEGIN:VCALENDAR
+             BEGIN:VEVENT
+             CLASS:PUBLIC
+             END:VEVENT
+             END:VCALENDAR
+             """)
+  end
+
+  test "unhandled types are just used as-is" do
+    data = [
+      vcalendar: [
+        [
+          vevent: [
+            [
+              x_unknown: {1, [x_foo: 2]}
+            ]
+          ]
+        ]
+      ]
+    ]
+
+    assert Calex.encode!(data) ==
+             crlf("""
+             BEGIN:VCALENDAR
+             BEGIN:VEVENT
+             X-UNKNOWN;X-FOO=2:1
+             END:VEVENT
+             END:VCALENDAR
+             """)
+  end
+
+  test "parameter values are properly escaped" do
+    data = [
+      vcalendar: [
+        [
+          vevent: [
+            [
+              organizer: {
+                "mailto:organizer@example.com",
+                [
+                  cn: ~s(Dwayne "The Rock" \n\nJohnson),
+                  sent_by: "mailto:person@example.com",
+                  x_comma: "1,2,3",
+                  x_semicolon: "1;2;3",
+                  x_type: :important
+                ]
+              }
+            ]
+          ]
+        ]
+      ]
+    ]
+
+    assert Calex.encode!(data) ==
+             crlf("""
+             BEGIN:VCALENDAR
+             BEGIN:VEVENT
+             ORGANIZER;CN=Dwayne 'The Rock' Johnson;SENT-BY="mailto:person@example.com";
+              X-COMMA="1,2,3";X-SEMICOLON="1;2;3";X-TYPE=IMPORTANT:mailto:organizer@examp
+              le.com
+             END:VEVENT
+             END:VCALENDAR
+             """)
+  end
+
+  test "escaped characters in property value" do
+    data = [
+      vcalendar: [
+        [
+          vevent: [
+            [
+              description: {
+                "text escaping \\ ; , \n \r\n \\n \" end",
+                []
+              }
+            ]
+          ]
+        ]
+      ]
+    ]
+
+    # note the ~S used here to disable escaping
+    assert Calex.encode!(data) ==
+             crlf(~S"""
+             BEGIN:VCALENDAR
+             BEGIN:VEVENT
+             DESCRIPTION:text escaping \\ \; \, \n \n \\n " end
+             END:VEVENT
+             END:VCALENDAR
+             """)
+  end
+
   defp crlf(string) do
     string
     |> String.split("\n")
