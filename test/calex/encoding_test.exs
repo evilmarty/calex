@@ -184,6 +184,52 @@ defmodule Calex.EncodingTest do
              """)
   end
 
+  test "encodes atom property value" do
+    data = [
+      vcalendar: [
+        [
+          vevent: [
+            [
+              class: {:public, []}
+            ]
+          ]
+        ]
+      ]
+    ]
+
+    assert Calex.encode!(data) ==
+             crlf("""
+             BEGIN:VCALENDAR
+             BEGIN:VEVENT
+             CLASS:PUBLIC
+             END:VEVENT
+             END:VCALENDAR
+             """)
+  end
+
+  test "unhandled types are just used as-is" do
+    data = [
+      vcalendar: [
+        [
+          vevent: [
+            [
+              x_unknown: {1, [x_foo: 2]}
+            ]
+          ]
+        ]
+      ]
+    ]
+
+    assert Calex.encode!(data) ==
+             crlf("""
+             BEGIN:VCALENDAR
+             BEGIN:VEVENT
+             X-UNKNOWN;X-FOO=2:1
+             END:VEVENT
+             END:VCALENDAR
+             """)
+  end
+
   test "parameter values are properly escaped" do
     data = [
       vcalendar: [

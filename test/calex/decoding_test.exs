@@ -300,6 +300,52 @@ defmodule Calex.DecodingTest do
            ]
   end
 
+  test "bad DURATION property value is just returned as-is" do
+    data =
+      crlf("""
+      BEGIN:VCALENDAR
+      BEGIN:VEVENT
+      DURATION:LONGTIME
+      END:VEVENT
+      END:VCALENDAR
+      """)
+
+    assert Calex.decode!(data) == [
+             vcalendar: [
+               [
+                 vevent: [
+                   [
+                     duration: {"LONGTIME", []}
+                   ]
+                 ]
+               ]
+             ]
+           ]
+  end
+
+  test "bad DURATION value is just returned as-is" do
+    data =
+      crlf("""
+      BEGIN:VCALENDAR
+      BEGIN:VEVENT
+      X-APPLE-TRAVEL-DURATION;VALUE=DURATION:LONGTIME
+      END:VEVENT
+      END:VCALENDAR
+      """)
+
+    assert Calex.decode!(data) == [
+             vcalendar: [
+               [
+                 vevent: [
+                   [
+                     x_apple_travel_duration: {"LONGTIME", [value: "DURATION"]}
+                   ]
+                 ]
+               ]
+             ]
+           ]
+  end
+
   test "truncates very long property names" do
     long_name = 0..256 |> Enum.map_join(fn _ -> "X" end)
     truncated_long_name = 0..254 |> Enum.map_join(fn _ -> "x" end) |> String.to_atom()
@@ -394,6 +440,35 @@ defmodule Calex.DecodingTest do
                        "text escaping \\ ; , \n \n \\n end",
                        []
                      }
+                   ]
+                 ]
+               ]
+             ]
+           ]
+  end
+
+  test "accumulate blocks of the same key" do
+    data =
+      crlf("""
+      BEGIN:VCALENDAR
+      BEGIN:VEVENT
+      SUBJECT:event 1
+      END:VEVENT
+      BEGIN:VEVENT
+      SUBJECT:event 2
+      END:VEVENT
+      END:VCALENDAR
+      """)
+
+    assert Calex.decode!(data) == [
+             vcalendar: [
+               [
+                 vevent: [
+                   [
+                     subject: {"event 1", []}
+                   ],
+                   [
+                     subject: {"event 2", []}
                    ]
                  ]
                ]
