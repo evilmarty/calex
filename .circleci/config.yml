@@ -6,7 +6,7 @@ jobs:
     # https://circleci.com/docs/2.0/configuration-reference/#resourceclass
     resource_class: "large"
     docker:
-      - image: cimg/elixir:1.14.0
+      - image: cimg/elixir:1.17-erlang-26.2.1
 
     environment:
       MIX_ENV: test
@@ -20,7 +20,7 @@ jobs:
             mix --version
       - restore_cache:
           keys:
-            - elixir-build-v1.13.0-{{ checksum "mix.lock" }}
+            - elixir-build-v1.17.0-{{ checksum "mix.lock" }}
       - restore_cache:
           keys:
             - elixir-plt-v2-{{ checksum "mix.lock" }}
@@ -37,7 +37,7 @@ jobs:
           name: "Compile Elixir source"
           command: mix compile --warnings-as-errors
       - save_cache:
-          key: elixir-build-v1.13.0-{{ checksum "mix.lock" }}
+          key: elixir-build-v1.17.0-{{ checksum "mix.lock" }}
           paths:
             - "_build"
             - "deps"
