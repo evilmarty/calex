@@ -11,7 +11,7 @@ Add `calex` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:calex, "~> 0.2.0"}
+    {:calex, "~> 0.3.0"}
   ]
 end
 ```
