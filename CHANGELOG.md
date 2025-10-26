@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Handle empty property values and improve property name parsing
+
 ## 0.2.0
 
 * Resolve ambiguities when casting date/times

@@ -1,6 +1,7 @@
 defmodule Calex.Decoder do
   @moduledoc false
 
+  alias Calex.PropertyName
   alias Calex.{DecodeError, InvalidTimeZoneError}
 
   # https://rubular.com/r/sXPKG84KfgtfMV
@@ -55,13 +56,13 @@ defmodule Calex.Decoder do
       ["", _prop_val] ->
         raise DecodeError, message: "property key missing or blank line"
 
-      [prop_key, ""] ->
-        raise DecodeError, message: "property has no value: #{inspect(prop_key)}"
-
       [prop_key, prop_val] ->
-        case prop_key do
-          "DURATION" -> {:duration, {decode_duration(prop_val), []}}
-          prop_key -> {decode_key(prop_key), {decode_value(prop_val, []), []}}
+        with prop_key <- PropertyName.parse!(prop_key) do
+          if String.upcase(prop_key) == "DURATION" do
+            {:duration, {decode_duration(prop_val), []}}
+          else
+            {decode_key(prop_key), {decode_value(prop_val, []), []}}
+          end
         end
 
       [prop_key | params_and_prop_val] ->
@@ -204,8 +205,9 @@ defmodule Calex.Decoder do
     |> NaiveDateTime.to_date()
   end
 
-  defp decode_key(bin) do
-    bin
+  defp decode_key(key) do
+    key
+    |> PropertyName.parse!()
     |> String.replace("-", "_")
     |> String.downcase()
     |> String.slice(0..254)
