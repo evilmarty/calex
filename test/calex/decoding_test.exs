@@ -53,6 +53,56 @@ defmodule Calex.DecodingTest do
            ]
   end
 
+  test "decodes ambiguous timestamps" do
+    data =
+      crlf("""
+      BEGIN:VCALENDAR
+      BEGIN:VEVENT
+      DTSTAMP;TZID=America/New_York:20251102T010000
+      END:VEVENT
+      END:VCALENDAR
+      """)
+
+    {:ambiguous, first, _second} = DateTime.new(~D[2025-11-02], ~T[01:00:00], "America/New_York")
+
+    assert Calex.decode!(data) == [
+             vcalendar: [
+               [
+                 vevent: [
+                   [
+                     dtstamp: {first, [tzid: "America/New_York"]}
+                   ]
+                 ]
+               ]
+             ]
+           ]
+  end
+
+  test "decodes gap timestamps" do
+    data =
+      crlf("""
+      BEGIN:VCALENDAR
+      BEGIN:VEVENT
+      DTSTAMP;TZID=Europe/Copenhagen:20190331T023000
+      END:VEVENT
+      END:VCALENDAR
+      """)
+
+    {:gap, _first, second} = DateTime.new(~D[2019-03-31], ~T[02:30:00], "Europe/Copenhagen")
+
+    assert Calex.decode!(data) == [
+             vcalendar: [
+               [
+                 vevent: [
+                   [
+                     dtstamp: {second, [tzid: "Europe/Copenhagen"]}
+                   ]
+                 ]
+               ]
+             ]
+           ]
+  end
+
   test "decodes naive/floating datetimes" do
     data =
       crlf("""

@@ -158,11 +158,36 @@ defmodule Calex.Decoder do
           end
 
           naive_datetime
-          |> DateTime.from_naive!(time_zone)
+          |> from_naive_datetime!(time_zone)
           |> DateTime.truncate(:second)
       end
     else
       naive_datetime
+    end
+  end
+
+  # Casts a naive date time to a zoned date time.
+  #
+  # When ambiguous, pick the earlier occurrence.
+  #
+  #   Rationale: Many ecosystems default to the earlier instant (e.g., Python’s default
+  #   before fold=1, java.time’s resolver), and it avoids “unexpectedly
+  #   jumping an hour later.” For calendars, users typically think “the time I
+  #   typed” should map to the first moment that matches it.
+  #
+  # When a gap is encountered, pick the later occurrence.
+  #
+  #   Rationale: The wall time doesn’t exist; advancing to the next valid time
+  #   preserves “same clock face time as closely as possible going forward,”
+  #   which is what users expect when a 02:30 that doesn’t exist gets
+  #   scheduled.
+  #
+  defp from_naive_datetime!(naive_datetime, time_zone) do
+    case DateTime.from_naive(naive_datetime, time_zone) do
+      {:ok, datetime} -> datetime
+      {:ambiguous, first, _second} -> first
+      {:gap, _first, second} -> second
+      {:error, term} -> raise InvalidTimeZoneError, message: "failed with #{term} error"
     end
   end
 
